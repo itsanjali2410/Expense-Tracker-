@@ -1,17 +1,23 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, FileText, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { Transaction, TransactionType, SummaryStats } from './types';
-import { extractTransactionsFromPDF } from './services/geminiService';
+import { processStatement } from './services/api';
 import { SummaryCards } from './components/SummaryCards';
 import { SpendingCharts } from './components/SpendingCharts';
 import { TransactionTable } from './components/TransactionTable';
 import { AnalysisPanel } from './components/AnalysisPanel';
 
 const App: React.FC = () => {
+  const [isMounted, setIsMounted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  // SSR Safety: Ensure we only render browser-specific elements after mounting
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -26,30 +32,33 @@ const App: React.FC = () => {
     setError(null);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
-        try {
-          const extracted = await extractTransactionsFromPDF(base64);
-          setTransactions(extracted);
-        } catch (err: any) {
-          setError(err.message || 'Failed to process PDF.');
-        } finally {
-          setIsProcessing(false);
-        }
-      };
-      reader.onerror = () => {
-        setError('Error reading file.');
-        setIsProcessing(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setError('An unexpected error occurred.');
+      /**
+       * Frontend Action:
+       * Here we simulate 'fetching' from an API route. 
+       * All the PDF parsing and Gemini logic is now hidden inside the processStatement service.
+       */
+      const extracted = await processStatement(file);
+      setTransactions(extracted);
+    } catch (err: any) {
+      setError(err.message || 'Failed to process PDF.');
+    } finally {
       setIsProcessing(false);
     }
   };
 
   const stats: SummaryStats = useMemo(() => {
+    if (transactions.length === 0) {
+      return {
+        totalIncome: 0,
+        totalExpenses: 0,
+        netBalance: 0,
+        transactionCount: 0,
+        averageDailyExpense: 0,
+        highestSpendingDay: { date: 'N/A', amount: 0 },
+        categoryTotals: {}
+      };
+    }
+
     const income = transactions
       .filter(t => t.type === TransactionType.CREDIT)
       .reduce((sum, t) => sum + t.amount, 0);
@@ -92,13 +101,18 @@ const App: React.FC = () => {
     };
   }, [transactions]);
 
+  // Prevent hydration mismatch: return null or a loader until mounted
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen pb-20">
       <nav className="bg-white border-b border-slate-100 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
-              <div className="bg-indigo-600 p-2 rounded-xl">
+              <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-200">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">Smart Expense Tracker</h1>
@@ -112,10 +126,10 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         {!transactions.length && !isProcessing && (
-          <div className="max-w-xl mx-auto mt-12">
+          <div className="max-w-xl mx-auto mt-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center mb-10">
-              <h2 className="text-3xl font-bold text-slate-900 mb-4">Track your spends in Rupees</h2>
-              <p className="text-slate-500">Upload your Indian bank statement PDF. We'll categorize your Food, Travel, and Savings automatically.</p>
+              <h2 className="text-3xl font-extrabold text-slate-900 mb-4">Track your spends in Rupees</h2>
+              <p className="text-slate-500 text-lg">Upload your Indian bank statement PDF. We'll categorize your Food, Travel, and Savings automatically.</p>
             </div>
 
             <div className="relative group">
@@ -125,8 +139,8 @@ const App: React.FC = () => {
                 onChange={handleFileUpload}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
-              <div className="border-2 border-dashed border-slate-300 group-hover:border-indigo-500 bg-white p-12 rounded-3xl transition-all flex flex-col items-center justify-center gap-4 text-center">
-                <div className="p-4 bg-indigo-50 rounded-2xl group-hover:bg-indigo-100 transition-colors">
+              <div className="border-2 border-dashed border-slate-200 group-hover:border-indigo-500 group-hover:bg-indigo-50/30 bg-white p-12 rounded-3xl transition-all flex flex-col items-center justify-center gap-4 text-center shadow-sm">
+                <div className="p-4 bg-indigo-50 rounded-2xl group-hover:scale-110 transition-transform">
                   <Upload className="w-8 h-8 text-indigo-600" />
                 </div>
                 <div>
@@ -149,12 +163,12 @@ const App: React.FC = () => {
           <div className="max-w-md mx-auto mt-24 text-center">
             <div className="flex flex-col items-center gap-6">
               <div className="relative">
-                <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                <Loader2 className="w-6 h-6 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                <div className="w-20 h-20 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                <Loader2 className="w-8 h-8 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Categorizing Transactions...</h3>
-                <p className="text-slate-500">Gemini is identifying patterns in your Food, Travel, and other expenses.</p>
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">Analyzing Document...</h3>
+                <p className="text-slate-500">Gemini is identifying patterns in your Food, Travel, and other expenses safely via our processing API.</p>
               </div>
             </div>
           </div>
@@ -169,7 +183,7 @@ const App: React.FC = () => {
               </div>
               <button 
                 onClick={() => setTransactions([])}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
               >
                 <FileText className="w-4 h-4" />
                 Reset & Upload
@@ -195,7 +209,7 @@ const App: React.FC = () => {
 
       <footer className="mt-20 py-8 border-t border-slate-100 text-center">
         <p className="text-sm text-slate-400">
-          Secure Local Processing • INR (₹) Supported • Built for Modern Finance
+          Secure Local Processing • SSR-Ready Architecture • INR (₹) Supported
         </p>
       </footer>
     </div>
