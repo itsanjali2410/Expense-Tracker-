@@ -1,0 +1,5 @@
+{
+  "name": "Smart Expense Tracker - Layer 1",
+  "description": "A high-performance financial tool that extracts transactions from bank statement PDFs using Gemini AI, providing instant spending analysis and visual summaries without data storage.",
+  "requestFramePermissions": []
+}
