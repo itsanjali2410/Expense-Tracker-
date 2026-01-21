@@ -1,17 +1,18 @@
 
 import React from 'react';
-import { SummaryStats } from '../types';
+import { SummaryStats, CurrencyConfig } from '../../types';
 import { TrendingUp, TrendingDown, Wallet, BarChart3 } from 'lucide-react';
 
 interface SummaryCardsProps {
   stats: SummaryStats;
+  currency: CurrencyConfig;
 }
 
-export const SummaryCards: React.FC<SummaryCardsProps> = ({ stats }) => {
+export const SummaryCards: React.FC<SummaryCardsProps> = ({ stats, currency }) => {
   const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('en-IN', { 
+    new Intl.NumberFormat(currency.locale, { 
       style: 'currency', 
-      currency: 'INR',
+      currency: currency.code,
       maximumFractionDigits: 0 
     }).format(val);
 

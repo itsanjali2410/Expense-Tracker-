@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, FileText, AlertCircle, Loader2, Sparkles } from 'lucide-react';
-import { Transaction, TransactionType, SummaryStats } from './types';
-import { processStatement } from './services/api';
+import { Transaction, TransactionType, SummaryStats } from '../types';
+import { processStatement } from '../services/api';
 import { SummaryCards } from './components/SummaryCards';
 import { SpendingCharts } from './components/SpendingCharts';
 import { TransactionTable } from './components/TransactionTable';
@@ -14,7 +14,6 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  // SSR Safety: Ensure we only render browser-specific elements after mounting
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -152,7 +151,7 @@ const App: React.FC = () => {
 
             {error && (
               <div className="mt-6 p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3 text-rose-700">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <p className="text-sm font-medium">{error}</p>
               </div>
             )}
